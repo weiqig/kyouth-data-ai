@@ -1,12 +1,18 @@
 import sys
+import logging
 from src import Ingestor, Processor, Loader, Profiler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s |%(levelname)s |%(message)s"
+)
 
 
 def display_help(command_list: list) -> None:
     '''
     Display help and list of commands.
     '''
-    print("\ncommands:\n", end='')
+    print("\navailable commands:\n", end='')
     print(", ".join(command_list))
 
 
@@ -48,10 +54,11 @@ def main() -> None:
                 loader.load_all_jsons()
                 profiler.run_data_profile()
             case _:
-                print("Unknown command:", command)
+                msg = f"Unknown command: {command}"
+                logging.warning(msg)
                 display_help(command_list)
     except Exception as e:
-        print(e)
+        logging.error(e)
 
 
 if __name__ == "__main__":

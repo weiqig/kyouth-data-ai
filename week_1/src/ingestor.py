@@ -1,7 +1,13 @@
 import os
+import logging
 from pathlib import Path
 from email import policy
 from email.parser import BytesParser
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s |%(levelname)s |%(message)s"
+)
 
 
 class Ingestor:
@@ -39,16 +45,12 @@ class Ingestor:
 
                 if content:
                     destination = self.out_dir / f"{filename}.html"
-                    if destination.exists():
-                        print(f"{filename}.html already exists, proceeding...")
-                    else:
-                        destination.write_text(content, encoding="utf-8")
-                        self.extracted += 1
-                        print(f"✅ Extracted: {filename}.mhtml")
+                    destination.write_text(content, encoding="utf-8")
+                    self.extracted += 1
+                    logging.info(f"✅ Extracted: {filename}.mhtml")
                 else:
                     self.failed += 1
-                    print(f"⚠️ No HTML content found in: {filename}.mhtml")
-
+                    logging.warning(f"⚠️ No HTML content found in: {filename}.mhtml")
                 self.total += 1
 
         print("")

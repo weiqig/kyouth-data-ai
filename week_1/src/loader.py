@@ -1,7 +1,13 @@
 import os
 import json
 import sqlite3
+import logging
 from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s |%(levelname)s |%(message)s"
+)
 
 
 class Loader:
@@ -28,7 +34,7 @@ class Loader:
         try:
             self.insert_silver_data()
         except Exception as e:
-            print(e)
+            logging.error(e)
         print("")
         self.get_results()
 
@@ -72,10 +78,10 @@ class Loader:
                             )
                     """
             if self.db.execute(query, gold_data).rowcount == 0:
-                print("⏭️ Skipped (duplicate):", filename)
+                logging.warning("⏭️  Skipped (duplicate): %s", filename)
                 self.skipped += 1
             else:
-                print("✅ Inserted:", filename)
+                logging.info("✅ Inserted: %s", filename)
                 self.inserted += 1
             self.total += 1
         self.db.commit()
