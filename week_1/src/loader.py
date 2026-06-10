@@ -51,17 +51,20 @@ class Loader:
             with open(self.database, 'w'):
                 pass
         self.db = sqlite3.connect(self.database)
-        self.db.execute("""
-        CREATE TABLE IF NOT EXISTS JOBS(
-            source_id TEXT PRIMARY KEY,
-            job_title TEXT,
-            company TEXT,
-            description TEXT,
-            tech_stack TEXT,
-            content_hash TEXT
-        )
-        """)
+        with open("queries/create_jobs_tbl.sql", "r", encoding="utf-8") as f:
+            sql = f.read()
+        self.db.executescript(sql)
         self.db.commit()
+
+    def execute_sql(self, sql_file: str, args: tuple = ()) -> list:
+        '''
+        Execute a SQL query with optional parameters and return the results.
+        '''
+        with open(sql_file, "r", encoding="utf-8") as f:
+            sql = f.read()
+
+        cursor = self.db.execute(sql, args)
+        return cursor
 
     def hash_contents(self, data: dict) -> str:
         '''
@@ -79,20 +82,14 @@ class Loader:
             Insert json data into the database.
         '''
         files = sorted([f for f in self.src_dir.glob("*.json")])
-        fields = ["source_id", "job_title", "description", "company", "content_hash"]
         for file in files:
             filename = f"{file.stem}.json"
             path = Path(file)
             silver_data = json.loads(path.read_text(encoding="utf-8"))
             # content hashing to detect duplicates
             content_hash = self.hash_contents(silver_data)
-            query = """
-                        SELECT source_id, content_hash
-                        FROM jobs
-                        WHERE source_id = ?;
-                    """
             # check if conent hash in database matches new content hash
-            row = self.db.execute(query, (silver_data['source_id'],)).fetchone()
+            row = self.execute_sql("queries/get_content_hash.sql", (silver_data['source_id'],)).fetchone()
             if row:
                 # skip if existing hash is identical with content_hash
                 old_hash = row[1]
@@ -102,34 +99,18 @@ class Loader:
                     continue
                 # update existing record otherwise
                 elif old_hash is None or old_hash != content_hash:
-                    query = """
-                                UPDATE JOBS
-                                SET job_title = ?,
-                                    description = ?,
-                                    company = ?,
-                                    content_hash = ?
-                                WHERE source_id = ?;
-                            """
-                    self.db.execute(query, (
+                    self.execute_sql("queries/upd_existing_job.sql", (
                         silver_data['job_title'],
                         silver_data['description'],
                         silver_data['company'],
                         content_hash,
-                        silver_data['source_id'])
+                        silver_data['source_id'],)
                     )
                     logging.info("🔄 Updated: %s", filename)
                     self.inserted += 1
             # insert new record with content_hash
             else:
-                query = f"""
-                            INSERT OR IGNORE INTO JOBS (
-                                    {', '.join(fields)}
-                                )
-                                VALUES(
-                                    ?, ?, ?, ?, ?
-                                )
-                        """
-                self.db.execute(query, (
+                self.execute_sql("queries/ins_new_job.sql",  (
                     silver_data["source_id"],
                     silver_data["job_title"],
                     silver_data["description"],
