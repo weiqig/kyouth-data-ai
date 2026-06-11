@@ -20,30 +20,33 @@ The goal is to build a robust and idempotent pipeline that:
     - Displays formatted database information from jobs.db
 
 
-## Architecture Overview
+## ETL pipeline and Medallion Architecture overview
 
-The pipeline follows a standard ETL flow:
+The pipeline follows a standard ETL pipeline:
 
 [SOURCE] → [EXTRACT] → [CLEAN / PROCESS] → [LOAD] → [DATABASE]
+
+Also known as a medallion architecture, which is a layered data design pattern that organizes data into Bronze, Silver, and Gold layers to progressively improve quality, structure, and usability to ensure reliability, and performance as it flows through the system. It is not tied to a specific technology and can be implemented on platforms like Databricks, Snowflake, or Hadoop-based systems
 
 ### Key Components
 
 Extractor (Bronze):
+- Captures raw, unprocessed data to be processed
 - Reads raw files from 0_source
 - Handles ingestion in a consistent format
 
 Processing Layer (Silver):
+- Performs data cleaning, validation, and transformation
 - Cleans HTML from descriptions
 - Normalizes text and fields
-- Extracts relevant metadata (e.g., tech stack)
+- Extracts relevant metadata (e.g., job title, company)
 
 Storage Layer (Gold):
+- provides high quality datasets ready for use
 - Writes structured data into jobs.db
 - Ensures schema consistency
 
-Orchestrator (main.py):
-- Coordinates the full pipeline
-- Ensures repeatable (idempotent) runs
+
 
 ## Instructions
 1. Environment Setup
@@ -70,11 +73,11 @@ Orchestrator (main.py):
     uv run python main.py <command>
     ```
 
-    availble commands include:
-    - ingest - extracts *.html from *.mhtml files from ( 0_source > 1_bronze )
-    - process - process and clean html data into .json (1_bronze > 2_silver)
-    - load - load json data into jobs.db (2_silver > 3_gold)
-    - profile - provide a detailed output of database information (3_gold)
+    available commands include:
+    - **ingest** - extracts *.html from *.mhtml files from ( 0_source > 1_bronze )
+    - **process** - process and clean html data into .json (1_bronze > 2_silver)
+    - **load** - load json data into jobs.db (2_silver > 3_gold)
+    - **profile** - provide a detailed output of database information (3_gold)
 
     To execute the full ETL pipeline:
     ```sh
