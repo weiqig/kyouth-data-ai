@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS JOBS(
+CREATE TABLE IF NOT EXISTS JOBS_QUARANTINE(
             source_id TEXT PRIMARY KEY,
             job_title TEXT,
             company TEXT,

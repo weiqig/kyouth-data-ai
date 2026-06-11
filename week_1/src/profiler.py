@@ -35,6 +35,18 @@ class Profiler:
                 raise Exception("Database not found!")
             else:
                 self.db = sqlite3.connect(self.database)
+                with open("queries/create_jobs_quarantine_tbl.sql", "r", encoding="utf-8") as f:
+                    sql = f.read()
+                    self.db.executescript(sql)
+                    self.db.commit()
+                with open("queries/upd_filter_job_quality.sql", "r", encoding="utf-8") as f:
+                    sql = f.read()
+                    self.db.executescript(sql)
+                    self.db.commit()
+                with open("queries/ins_del_low_quality_jobs.sql", "r", encoding="utf-8") as f:
+                    sql = f.read()
+                    self.db.executescript(sql)
+                    self.db.commit()
                 self.fetch_data()
         except Exception as e:
             print(e)
