@@ -2,6 +2,7 @@ import os
 import sys
 import requests
 import time
+import ollama
 from dotenv import load_dotenv
 from google import genai
 from google.api_core.exceptions import GoogleAPIError
@@ -28,7 +29,7 @@ def prompt_model(model: str, prompt: str) -> str:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": {"temperature": 0, "num_ctx": 4096, "num_predict": 1024},
+            "options": {"temperature": 0, "num_ctx": 2048, "num_predict": 512},
         },
         timeout=60,
     )
@@ -42,7 +43,7 @@ def prompt_model(model: str, prompt: str) -> str:
         "model": model,
         "response": data["response"],
         "tokens_used": data["prompt_eval_count"] + data["eval_count"],
-        "total_time": data["total_duration"] / 1000000,
+        "total_time": round(data["total_duration"] / 1000000, 3),
     }
 
 
@@ -64,11 +65,7 @@ def prompt_gemini(model_name: str, prompt: str) -> str:
             contents=prompt,
         )
         end = time.perf_counter()
-        # genai.configure(api_key=API_KEY)
-        # model = genai.GenerativeModel(model_name)
-        # start = time.perf_counter()
-        # response = model.generate_content(prompt)
-        # end = time.perf_counter()
+
         if __name__ == "__main__":
             print("\n--- RESPONSE ---\n")
         return {
@@ -77,7 +74,6 @@ def prompt_gemini(model_name: str, prompt: str) -> str:
             "tokens_used": response.usage_metadata.total_token_count,
             "total_time": (end - start) * 1000,
         }
-
     except GoogleAPIError as e:
         return f"[Gemini Error]: {e}"
     except Exception as e:
@@ -88,15 +84,7 @@ def main() -> None:
     """
     Execute the program.
     """
-    models = [
-        "llama3.1",
-        "phi3",
-        "deepseek-r1:1.5b",
-        "gemma3",
-        "qwen2.5-coder",
-        "gemini-2.5-flash",
-        "gemini-3-flash-preview",
-    ]
+
     if len(sys.argv) != 3:
         print("Usage: uv run prompt_model.py <model> <prompt>")
         return
@@ -104,16 +92,14 @@ def main() -> None:
         model = sys.argv[1]
         prompt = sys.argv[2]
 
+        models = ollama.list()
+        models = [model.model.replace(":latest", "") for model in models.models]
         if model not in models:
-            raise ValueError(f"Invalid model provided!\nModels available: {models}")
+            raise ValueError(f"Invalid model provided!\nOllama models available: {models}")
 
         output = prompt_model(model, prompt)
 
         print(output["response"])
-        if __name__ != "__main__":
-            print(
-                f"Total tokens used: {output['tokens_used']}, took {output['total_time']}ms"
-            )
     except Exception as e:
         print(e)
 
