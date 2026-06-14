@@ -1,8 +1,14 @@
 import os
+import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, model_validator, ValidationInfo, ValidationError
 from bs4 import BeautifulSoup
 from typing_extensions import Self
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s |%(levelname)s |%(message)s"
+)
 
 
 class Processor:
@@ -78,16 +84,16 @@ class Processor:
                 destination = self.out_dir / f"{filename}.json"
                 with destination.open("w", encoding="utf-8") as f:
                     f.write(job.model_dump_json(indent=2))
-                print(f"✅ Processed: {filename}.html")
+                logging.info(f"✅ Processed: {filename}.html")
                 self.processed += 1
             except ValidationError as e:
                 msg = e.errors()[0].get("ctx", {}).get("error")
-                print(msg)
+                logging.warning(msg)
                 self.skipped += 1
             except Exception as e:
-                print(e)
+                logging.error(e)
                 self.skipped += 1
-                continue
+                return
             self.total += 1
 
         print("")

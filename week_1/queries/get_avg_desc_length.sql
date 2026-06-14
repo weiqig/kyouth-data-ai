@@ -1,0 +1,2 @@
+SELECT CAST(AVG(LENGTH(description)) AS INT)
+FROM JOBS;

@@ -1,0 +1,4 @@
+SELECT source_id, job_title, LENGTH(description)
+FROM JOBS
+ORDER BY LENGTH(DESCRIPTION)
+LIMIT 1;

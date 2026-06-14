@@ -1,7 +1,14 @@
 import os
 import json
 import sqlite3
+import logging
 from pathlib import Path
+from hashlib import sha256
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s |%(levelname)s |%(message)s"
+)
 
 
 class Loader:
@@ -28,7 +35,9 @@ class Loader:
         try:
             self.insert_silver_data()
         except Exception as e:
-            print(e)
+            logging.error(e)
+        finally:
+            self.db.close()
         print("")
         self.get_results()
 
@@ -42,44 +51,76 @@ class Loader:
             with open(self.database, 'w'):
                 pass
         self.db = sqlite3.connect(self.database)
-        self.db.execute("""
-        CREATE TABLE IF NOT EXISTS JOBS(
-            source_id TEXT PRIMARY KEY,
-            job_title TEXT,
-            company TEXT,
-            description TEXT,
-            tech_stack TEXT
-        )
-        """)
+        with open("queries/create_jobs_tbl.sql", "r", encoding="utf-8") as f:
+            sql = f.read()
+        self.db.executescript(sql)
         self.db.commit()
+
+    def execute_sql(self, sql_file: str, args: tuple = ()) -> list:
+        '''
+        Execute a SQL query with optional parameters and return the results.
+        '''
+        with open(sql_file, "r", encoding="utf-8") as f:
+            sql = f.read()
+
+        cursor = self.db.execute(sql, args)
+        return cursor
+
+    def hash_contents(self, data: dict) -> str:
+        '''
+        Generate a hash of the content to detect silent changes.
+        '''
+        hash_input = (
+            f"{data['job_title'].strip().lower()}|"
+            f"{data['company'].strip().lower()}|"
+            f"{data['description'].strip().lower()}"
+        )
+        return sha256(hash_input.encode("utf-8")).hexdigest()
 
     def insert_silver_data(self) -> None:
         '''
             Insert json data into the database.
         '''
-        files = sorted([f for f in self.src_dir.iterdir()])
+        files = sorted([f for f in self.src_dir.glob("*.json")])
         for file in files:
             filename = f"{file.stem}.json"
             path = Path(file)
             silver_data = json.loads(path.read_text(encoding="utf-8"))
-            gold_data = list(silver_data.values())
-            query = f"""
-                        INSERT OR IGNORE INTO JOBS (
-                                {', '.join(list(silver_data.keys()))}
-                            )
-                            VALUES(
-                                ?, ?, ?, ?
-                            )
-                    """
-            if self.db.execute(query, gold_data).rowcount == 0:
-                print("⏭️ Skipped (duplicate):", filename)
-                self.skipped += 1
+            # content hashing to detect duplicates
+            content_hash = self.hash_contents(silver_data)
+            # check if conent hash in database matches new content hash
+            row = self.execute_sql("queries/get_content_hash.sql", (silver_data['source_id'],)).fetchone()
+            if row:
+                # skip if existing hash is identical with content_hash
+                old_hash = row[1]
+                if old_hash == content_hash:
+                    logging.warning("⏭️  Skipped (duplicate): %s", filename)
+                    self.skipped += 1
+                    continue
+                # update existing record otherwise
+                elif old_hash is None or old_hash != content_hash:
+                    self.execute_sql("queries/upd_existing_job.sql", (
+                        silver_data['job_title'],
+                        silver_data['description'],
+                        silver_data['company'],
+                        content_hash,
+                        silver_data['source_id'],)
+                    )
+                    logging.info("🔄 Updated: %s", filename)
+                    self.inserted += 1
+            # insert new record with content_hash
             else:
-                print("✅ Inserted:", filename)
+                self.execute_sql("queries/ins_new_job.sql",  (
+                    silver_data["source_id"],
+                    silver_data["job_title"],
+                    silver_data["description"],
+                    silver_data["company"],
+                    content_hash)
+                )
+                logging.info("✅ Inserted: %s", filename)
                 self.inserted += 1
             self.total += 1
         self.db.commit()
-        self.db.close()
 
     def get_results(self) -> None:
         '''
