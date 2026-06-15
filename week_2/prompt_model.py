@@ -5,7 +5,6 @@ import time
 import ollama
 from dotenv import load_dotenv
 from google import genai
-from google.api_core.exceptions import GoogleAPIError
 
 load_dotenv()
 
@@ -23,28 +22,36 @@ def prompt_model(model: str, prompt: str) -> str:
     if model in GEMINI_MODELS:
         return prompt_gemini(model, prompt)
 
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0, "num_ctx": 2048, "num_predict": 512},
-        },
-        timeout=60,
-    )
-    # raises exceptions on HTTP status
-    response.raise_for_status()
+    try:
+        models = ollama.list()
+        models = [model.model.replace(":latest", "") for model in models.models]
+        if model not in models:
+            raise ValueError(f"Invalid model provided!\nOllama models available: {models}")
 
-    data = response.json()
-    if __name__ == "__main__":
-        print("\n--- RESPONSE ---\n")
-    return {
-        "model": model,
-        "response": data["response"],
-        "tokens_used": data["prompt_eval_count"] + data["eval_count"],
-        "total_time": round(data["total_duration"] / 1000000, 3),
-    }
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0, "num_ctx": 2048, "num_predict": 1024},
+            },
+            timeout=60,
+        )
+        # raises exceptions on HTTP status
+        response.raise_for_status()
+
+        data = response.json()
+        if __name__ == "__main__":
+            print("\n--- RESPONSE ---\n")
+        return {
+            "model": model,
+            "response": data["response"],
+            "tokens_used": data["prompt_eval_count"] + data["eval_count"],
+            "total_time": round(data["total_duration"] / 1000000, 3),
+        }
+    except Exception as e:
+        return f"An unexpected error occurred while running ollama: {e}"
 
 
 def prompt_gemini(model_name: str, prompt: str) -> str:
@@ -74,10 +81,8 @@ def prompt_gemini(model_name: str, prompt: str) -> str:
             "tokens_used": response.usage_metadata.total_token_count,
             "total_time": (end - start) * 1000,
         }
-    except GoogleAPIError as e:
-        return f"[Gemini Error]: {e}"
     except Exception as e:
-        return f"An unexpected error occurred: {e}"
+        return f"An unexpected error occurred [Gemini Error]: {e}"
 
 
 def main() -> None:
@@ -91,14 +96,7 @@ def main() -> None:
     try:
         model = sys.argv[1]
         prompt = sys.argv[2]
-
-        models = ollama.list()
-        models = [model.model.replace(":latest", "") for model in models.models]
-        if model not in models:
-            raise ValueError(f"Invalid model provided!\nOllama models available: {models}")
-
         output = prompt_model(model, prompt)
-
         print(output["response"])
     except Exception as e:
         print(e)
