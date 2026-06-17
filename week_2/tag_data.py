@@ -4,7 +4,6 @@ import time
 import json
 import sqlite3
 
-# import asyncio
 from dotenv import load_dotenv
 from prompt_model import prompt_model
 
@@ -18,11 +17,11 @@ DB_PATH = os.getenv("DB_PATH", os.getenv("DB_PATH_TEST"))
 # Batch processing configuration
 BATCH_NO = 1
 BATCH_SIZE = 1
-RETRY_ATTEMPTS = 3
+RETRY_ATTEMPTS = int(os.getenv("RETRY_ATTEMPTS"))
 TOTAL_PROCESSED = 0
 TOKEN_USED = 0
 TOTAL_TIME = 0
-RETRY_COOLDOWN = 1
+RETRY_COOLDOWN = int(os.getenv("RETRY_COOLDOWN"))
 TECH_PATTERNS = {
     "Python": r"\bpython\b",
     "JavaScript": r"\bjavascript\b|\bjs\b",
@@ -192,11 +191,11 @@ def process_batch(conn, rows: list) -> bool:
     llm_rows = []
 
     for row in rows:
-        # tech_stack = regex_extract(row["desc"])
+        tech_stack = regex_extract(row["desc"])
 
-        # if tech_stack:
-        #     response.append({"id": row["id"], "tech_stack": tech_stack})
-        # else:
+        if tech_stack:
+            response.append({"id": row["id"], "tech_stack": tech_stack})
+        else:
             llm_rows.append(row)
 
     if llm_rows:
@@ -343,7 +342,7 @@ def main():
         if not os.path.exists(DB_PATH):
             raise FileNotFoundError(f"Database file not found at path: {DB_PATH}")
 
-        # del_tech_stack_data(DB_PATH)
+        del_tech_stack_data(DB_PATH)
         tag_data(DB_PATH)
     except Exception as e:
         print(e)
@@ -351,66 +350,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# mcp = FastMCP("SQLite-Service")
-
-
-# # @mcp.tool
-# # def query_db(sql_query: str):
-
-# # 	"""Executes a SQL query against the SQLite database and returns results."""
-# # 	with sqlite3.connect(DB_PATH) as conn:
-# # 		cursor = conn.cursor()
-# # 		cursor.execute(sql_query)
-# # 		return cursor.fetchall()
-
-
-# @mcp.tool()
-# def count_jobs() -> int:
-
-# 	"""Return the total number of jobs in the JOBS table."""
-# 	with sqlite3.connect(DB_PATH) as conn:
-# 		conn.row_factory = sqlite3.Row
-# 		cursor = conn.cursor()
-# 		row = cursor.execute("SELECT COUNT(*) AS total FROM JOBS").fetchone()
-# 		return row['total']
-
-
-# @mcp.tool()
-# def get_job_dtl() -> dict:
-# 	"""Return the specified job information and details."""
-# 	with sqlite3.connect(DB_PATH) as conn:
-# 		conn.row_factory = sqlite3.Row
-# 		cursor = conn.cursor()
-# 		rows = cursor.execute("""
-# 			SELECT id, job_title, company, description, tech_stack
-# 			FROM JOBS
-# 		""").fetchall()
-# 		return [dict(row) for row in rows]
-
-
-# load_dotenv()
-# api_key = os.getenv("GEMINI_API_KEY")
-
-# if not api_key:
-# 	raise ValueError("Missing GEMINI_API_KEY in .env!")
-
-# # Initialize clients
-# mcp_client = Client("db_server.py") # Connects via stdio
-# gemini = genai.Client() # Gemini API connection, requires GEMINI_API_KEY from .env
-
-# async def main():
-#     async with mcp_client:
-#         # Pass the MCP session directly into Gemini's tool config
-#         response = await gemini.aio.models.generate_content(
-#             model="gemini-3-flash-preview",
-#             contents= build_prompt(),
-#             config=genai.types.GenerateContentConfig(
-#                 tools=[mcp_client.session]
-#             ),
-#         )
-#         print(response.text)
-
-# if __name__ == "__main__":
-#     asyncio.run(main())
