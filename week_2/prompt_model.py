@@ -79,7 +79,7 @@ def prompt_gemini(model_name: str, prompt: str) -> str:
             "model": response.model_version,
             "response": response.text,
             "tokens_used": response.usage_metadata.total_token_count,
-            "total_time": (end - start) * 1000,
+            "total_time": round((end - start) * 1000, 3),
         }
     except Exception as e:
         return f"An unexpected error occurred [Gemini Error]: {e}"
