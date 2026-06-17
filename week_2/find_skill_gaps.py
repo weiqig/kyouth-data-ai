@@ -1,22 +1,24 @@
+import os
 import re
 import time
 import sqlite3
-from pathlib import Path
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from prompt_model import prompt_model
 from tag_data import execute_sql
 
 
-DB_PATH = Path("data/eval/jobs_d3_eval.db")
-INPUT_FILE = Path("data/eval/resume_d3_eval.txt")
-RETRY_ATTEMPTS = 3
-RETRY_TIME = 3
+load_dotenv()
 
+MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
+GEMINI_MODELS = os.getenv("GEMINI_MODELS", "")
+DB_PATH = os.getenv("DB_PATH_EVAL", os.getenv("DB_PATH_TEST"))
+INPUT_FILE = os.getenv("INPUT_FILE_EVAL")
 
-class SkillGapResult(BaseModel):
-	gaps: list[str]
+RETRY_ATTEMPTS = int(os.getenv("RETRY_ATTEMPTS"))
+RETRY_COOLDOWN = int(os.getenv("RETRY_COOLDOWN"))
 
-ALIAS_MAP = {
+SKILL_MAP = {
 	"a/b testing": ["a/b testing"],
 	"ab testing": ["a/b testing"],
 	"c/c++": ["c", "c++"],
@@ -31,11 +33,17 @@ ALIAS_MAP = {
 }
 
 
+class SkillGapResult(BaseModel):
+	gaps: list[str]
+	tokens_used: int
+	total_time: float
+
+
 def model_prompt(resume_content: str) -> str:
 	return (f"Extract comma-separated list of technical skills, languages, and tools from resume."
-				f"1. Output MUST be a single line in csv format.\n"
+				f"1. Output MUST be a single line in csv format and nothing else.\n"
 				f"2. Do NOT use bullet points, newlines, or markdown blocks.\n"
-				f"3. If no technical skills are found, output 'None'.\n\n"
+				f"3. If no technical skills found, output 'None'.\n\n"
 				f"Resume:\n{resume_content}")
 
 def normalize_skills(raw_skills_set: set) -> set:
@@ -44,8 +52,8 @@ def normalize_skills(raw_skills_set: set) -> set:
 	'''
 	normalized = set()
 	for skill in raw_skills_set:
-		if skill in ALIAS_MAP:
-			for mapped_skill in ALIAS_MAP[skill]:
+		if skill in SKILL_MAP:
+			for mapped_skill in SKILL_MAP[skill]:
 				normalized.add(mapped_skill)
 		else:
 			normalized.add(skill)
@@ -60,20 +68,19 @@ def find_skill_gaps(input_file_path: str, db_url: str) -> SkillGapResult:
 			with open(input_file_path, "r", encoding="utf-8", errors="ignore") as f:
 				resume = f.read()
 
-			response = prompt_model("gemma3:1b", model_prompt(resume))
+			response = prompt_model(MODEL, model_prompt(resume))
 			if not response:
 				raise ValueError("Model returned an empty string.")
-			print("Resume Response: ", response)
 
-			# remove thinking process block if exists
-			if "</thought>" in response:
-				response = response.split("</thought>")[-1]
+			if "An unexpected error occurred" in response:
+				print(response)
+				break
+			print("Resume Response:", response)
+			tokens_used, total_time = response['tokens_used'], response['total_time']
 
 			if isinstance(response, dict):
-				# Joins all values into a single comma-separated string
 				response = ", ".join(str(v) for v in response.values())
 
-			# skills from resume
 			# split response extracted from resume by comma, new line, tab, or spaces
 			raw_skills = re.split(r"[,\n\r\t]+", response)
 			resume_skills = set()
@@ -99,30 +106,36 @@ def find_skill_gaps(input_file_path: str, db_url: str) -> SkillGapResult:
 
 			gaps = sorted(normalize_skills(db_skills) - normalize_skills(resume_skills))
 
-			return SkillGapResult(gaps=sorted(gaps))
+			return SkillGapResult(
+					gaps=gaps,
+					tokens_used=tokens_used,
+					total_time=total_time
+				)
 
 		except Exception as e:
 			print(f"Attempt {attempt_num + 1} failed:", e)
 
 			if attempt_num + 1 < RETRY_ATTEMPTS:
-				print(f"Retrying in {RETRY_TIME}s...")
-				time.sleep(RETRY_TIME)
+				print(f"Retrying in {RETRY_COOLDOWN}s...")
+				time.sleep(RETRY_COOLDOWN)
 			else:
-				return SkillGapResult(gaps=[])
+				break
+	return SkillGapResult(gaps=[], tokens_used=0, total_time=0)
 
 
 def main():
 	'''
 	Execute the program.
 	'''
-	if not DB_PATH.exists():
+	if not os.path.exists(DB_PATH):
 		print(f"❌ Error: Database file not found at {DB_PATH}")
-	if not INPUT_FILE.exists():
+	if not os.path.exists(INPUT_FILE):
 		print(f"❌ Error: File file not found at {INPUT_FILE}")
 
 	result = find_skill_gaps(INPUT_FILE, DB_PATH)
 	if result:
-		print("\ngaps=", result.gaps)
+		print(f"gaps={result.gaps} ", end="")
+		print(f"time={result.total_time} tokens={result.tokens_used}")
 
 if __name__ == "__main__":
 	main()
