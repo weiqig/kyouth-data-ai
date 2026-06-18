@@ -75,7 +75,7 @@ def find_skill_gaps(input_file_path: str, db_url: str) -> SkillGapResult:
 			if "An unexpected error occurred" in response:
 				print(response)
 				break
-			print("Resume Response:", response)
+
 			tokens_used, total_time = response['tokens_used'], response['total_time']
 
 			if isinstance(response, dict):
