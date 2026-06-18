@@ -97,7 +97,11 @@ def main() -> None:
         model = sys.argv[1]
         prompt = sys.argv[2]
         output = prompt_model(model, prompt)
-        print(output["response"])
+        
+        if isinstance(output, dict):
+            print(output["response"])
+        else:
+            print(output)
     except Exception as e:
         print(e)
 
