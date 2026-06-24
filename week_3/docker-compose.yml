@@ -1,0 +1,74 @@
+services:
+  frontend:
+    image: frontend
+    build: ./frontend
+    env_file:
+      - .env
+    networks:
+      - app-net
+    volumes:
+      - ./frontend/src:/app/src
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  backend:
+    image: backend
+    build: ./backend
+    # depends_on:
+    #   ollama-model-initializer:
+    #     condition: service_completed_successfully
+    env_file:
+      - .env
+    networks:
+      - app-net
+    volumes:
+      - ./backend/src:/app/src
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    networks:
+      - app-net
+    volumes:
+      - ollama_storage:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  ollama-model-initializer:
+    profiles: ["ollama"]
+    image: curlimages/curl:latest
+    container_name: ollama-initializer
+    networks:
+      - app-net
+    depends_on:
+      - ollama
+    env_file: .env
+    command: >
+      sh -c "
+      echo 'Waiting for Ollama...';
+      until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 5; done;
+      echo 'Server is up! Models to pull: $DEFAULT_OLLAMA_MODELS';
+      for model in $DEFAULT_OLLAMA_MODELS; do
+        echo \"Pulling model: $$model\";
+        curl -s -o /dev/null -X POST http://ollama:11434/api/pull -d \"{\\\"name\\\": \\\"$$model\\\", \\\"stream\\\": false}\";
+      done;
+      echo 'All models pulled successfully.';
+      "
+    restart: "no"
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  ollama_storage:
