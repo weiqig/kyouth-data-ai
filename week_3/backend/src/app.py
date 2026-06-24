@@ -21,11 +21,6 @@ async def chat(request: Request):
 	try:
 		data = await request.json()
 
-		model = DEFAULT_MODEL
-
-		if not model:
-			return JSONResponse({"reply": "Model Error"})
-		print(f"\n[POST] processing request with {model}...")
 		user_message = data.get("message", "").strip()
 		file_name = data.get("fileName")
 		pdf_data = data.get("pdfText")
@@ -37,9 +32,8 @@ async def chat(request: Request):
 		prompt = user_message if user_message else 'what can you see'
 
 		if pdf_data:
-			# prompt += f"[Context from uploaded file '{file_name}': {pdf_data}]\n\n"
 			if "skill gaps" in user_message:
-				gaps = find_skill_gaps(model, pdf_data, BASE_DIR / DB_PATH)
+				gaps = find_skill_gaps(pdf_data, BASE_DIR / DB_PATH)
 				if gaps:
 					prompt += f"Be brief and return the skill gaps in a list categorized accordingly. Do not explain.\n"
 					prompt += f"the skill gaps from the resume are as follows: {str(gaps.gaps)}\n"
@@ -47,7 +41,6 @@ async def chat(request: Request):
 				else:
 					prompt += f"An issue occurred when trying to find skill gaps, proceed with your own assumptions.\n"
 					prompt += f"[Context from uploaded file '{file_name}': {pdf_data}]\n\n"
-				# return JSONResponse(content={"reply": str(output.gaps)})
 			else:
 				prompt += f"[Context from uploaded file '{file_name}': {pdf_data}]\n\n"
 

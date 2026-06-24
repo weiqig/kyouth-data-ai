@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from pathlib import Path
 from pydantic import BaseModel
 from .prompt_model import prompt_model
-from .tag_data import execute_sql
 
 
 load_dotenv()
@@ -41,6 +40,16 @@ class SkillGapResult(BaseModel):
 	total_time: float
 
 
+def execute_sql(conn, path_to_sql: str, args: tuple = ()):
+	"""
+	Execute and commit the sql statement in the file path provided.
+	"""
+	with open(path_to_sql, "r", encoding="utf-8") as sql:
+		cursor = conn.cursor()
+		cursor.execute(sql.read(), args)
+	return cursor
+
+
 def model_prompt(resume_content: str) -> str:
 	return (f"Extract comma-separated list of technical skills, languages, and tools from resume."
 				f"1. Output MUST be a single line in csv format and nothing else.\n"
@@ -61,7 +70,7 @@ def normalize_skills(raw_skills_set: set) -> set:
 			normalized.add(skill)
 	return normalized
 
-def find_skill_gaps(input_file_path: str, resume: str, db_url: str) -> SkillGapResult:
+def find_skill_gaps(resume: str, db_url: str) -> SkillGapResult:
 	'''
 	Find skill gaps in the resume based on the tech stacks listed in each job in the database.
 	'''
