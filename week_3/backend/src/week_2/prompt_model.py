@@ -82,10 +82,30 @@ def prompt_gemini(model_name: str, prompt: str, images=None) -> str:
     try:
         client = genai.Client(api_key=API_KEY)
 
+        contents = [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}],
+            }
+        ]
+
+        if images:
+            for img in images:
+                # strip data URL prefix if present
+                if "," in img:
+                    img = img.split(",", 1)[1]
+
+                contents[0]["parts"].append({
+                    "inline_data": {
+                        "mime_type": "image/jpeg",
+                        "data": img
+                    }
+                })
+
         start = time.perf_counter()
         response = client.models.generate_content(
             model=model_name,
-            contents=prompt,
+            contents=contents,
         )
         end = time.perf_counter()
         print(response)
