@@ -12,6 +12,7 @@ API_KEY = os.getenv("GOOGLE_API_KEY")
 GEMINI_MODELS = os.getenv("GEMINI_MODELS", "")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
+
 def prompt_model(model: str, prompt: str, images=None) -> str:
     """
     Prompt the model provided with the prompt given as the argument.
@@ -33,7 +34,9 @@ def prompt_model(model: str, prompt: str, images=None) -> str:
 
         models = [model.model.replace(":latest", "") for model in models.models]
         if model not in models:
-            raise ValueError(f"Invalid model provided!\nOllama models available: {models}")
+            raise ValueError(
+                f"Invalid model provided!\nOllama models available: {models}"
+            )
 
         url = f"{OLLAMA_HOST}/api/generate"
         response = requests.post(
@@ -49,8 +52,8 @@ def prompt_model(model: str, prompt: str, images=None) -> str:
                     "top_p": 0.9,
                     "repeat_penalty": 1.1,
                     "num_ctx": 2048,
-                    "num_predict": 1024
-                    },
+                    "num_predict": 1024,
+                },
             },
             timeout=60,
         )
@@ -95,12 +98,9 @@ def prompt_gemini(model_name: str, prompt: str, images=None) -> str:
                 if "," in img:
                     img = img.split(",", 1)[1]
 
-                contents[0]["parts"].append({
-                    "inline_data": {
-                        "mime_type": "image/jpeg",
-                        "data": img
-                    }
-                })
+                contents[0]["parts"].append(
+                    {"inline_data": {"mime_type": "image/jpeg", "data": img}}
+                )
 
         start = time.perf_counter()
         response = client.models.generate_content(
@@ -133,7 +133,7 @@ def main() -> None:
         model = sys.argv[1]
         prompt = sys.argv[2]
         output = prompt_model(model, prompt)
-        
+
         if isinstance(output, dict):
             print(output["response"])
         else:

@@ -25,27 +25,24 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 client = httpx.AsyncClient(timeout=30)
 
+
 @app.get("/chat", response_class=HTMLResponse)
 async def home(request: Request):
-	return templates.TemplateResponse(
-		request=request,
-		name="chat_page.html",
-		context={
-					"request": request,
-					"model_name": CURRENT_MODEL
-				},
-	)
+    return templates.TemplateResponse(
+        request=request,
+        name="chat_page.html",
+        context={"request": request, "model_name": CURRENT_MODEL},
+    )
+
 
 @app.post("/chat")
 async def proxy_chat(req: Request):
-	data = await req.json()
+    data = await req.json()
 
-	res = await client.post(
-		BACKEND_URL,
-		json=data
-	)
+    res = await client.post(BACKEND_URL, json=data)
 
-	return res.json()
+    return res.json()
+
 
 @app.on_event("shutdown")
 async def shutdown_handler():
